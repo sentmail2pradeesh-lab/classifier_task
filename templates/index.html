@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exposure Classifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a22;
+      --surface-2: #24242f;
+      --border: #2e2e3a;
+      --text: #e8e8ed;
+      --muted: #8888a0;
+      --accent: #6c63ff;
+      --accent-hover: #5a52e0;
+      --success: #4ade80;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: var(--surface);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface);
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108, 99, 255, 0.05);
+    }
+
+    .upload-zone svg {
+      width: 48px;
+      height: 48px;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .upload-zone h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .upload-zone p {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    #file-input { display: none; }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--border);
+    }
+
+    .preview-bar {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .preview-bar.visible { display: block; }
+
+    .preview-bar h3 {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .preview-thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .preview-thumbs img {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .status.error { color: #f87171; }
+    .status.loading { color: var(--accent); }
+
+    .results-section {
+      display: none;
+      margin-top: 2.5rem;
+    }
+
+    .results-section.visible { display: block; }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .results-header h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .output-info {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      word-break: break-all;
+    }
+
+    .output-info strong {
+      color: var(--success);
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform 0.15s;
+    }
+
+    .result-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .result-card img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+    }
+
+    .result-card-body {
+      padding: 0.85rem;
+    }
+
+    .label-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      margin-bottom: 0.5rem;
+      color: #111;
+    }
+
+    .result-card .filename {
+      font-size: 0.8rem;
+      color: var(--muted);
+      word-break: break-all;
+      margin-bottom: 0.25rem;
+    }
+
+    .result-card .renamed {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--success);
+    }
+
+    .result-card .meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Exposure Classifier</h1>
+    </header>
+
+    <div class="upload-zone" id="drop-zone">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+      </svg>
+      <h2>Drop images here or click to browse</h2>
+      <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/webp,image/bmp">
+    </div>
+
+    <div class="preview-bar" id="preview-bar">
+      <h3>Selected (<span id="file-count">0</span> images)</h3>
+      <div class="preview-thumbs" id="preview-thumbs"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" id="classify-btn" disabled>Classify Images</button>
+      <button class="btn-secondary" id="clear-btn" disabled>Clear</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <section class="results-section" id="results-section">
+      <div class="results-header">
+        <h2>Classification Results</h2>
+        <button class="btn-secondary" id="download-btn">Download All (ZIP)</button>
+      </div>
+      <div class="output-info" id="output-info" style="display: none;">
+        Images saved to Downloads folder: <strong id="output-path"></strong>
+      </div>
+      <div class="results-grid" id="results-grid"></div>
+    </section>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const classifyBtn = document.getElementById('classify-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const previewBar = document.getElementById('preview-bar');
+    const previewThumbs = document.getElementById('preview-thumbs');
+    const fileCount = document.getElementById('file-count');
+    const status = document.getElementById('status');
+    const resultsSection = document.getElementById('results-section');
+    const resultsGrid = document.getElementById('results-grid');
+    const outputInfo = document.getElementById('output-info');
+    const outputPath = document.getElementById('output-path');
+
+    let selectedFiles = [];
+    let lastResults = [];
+    let lastOutputFolder = '';
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      addFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+    function addFiles(fileList) {
+      const newFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+      selectedFiles = [...selectedFiles, ...newFiles];
+      updatePreview();
+    }
+
+    function updatePreview() {
+      previewThumbs.innerHTML = '';
+      fileCount.textContent = selectedFiles.length;
+      previewBar.classList.toggle('visible', selectedFiles.length > 0);
+      classifyBtn.disabled = selectedFiles.length === 0;
+      clearBtn.disabled = selectedFiles.length === 0;
+
+      selectedFiles.forEach(file => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.title = file.name;
+        previewThumbs.appendChild(img);
+      });
+    }
+
+    clearBtn.addEventListener('click', () => {
+      selectedFiles = [];
+      lastResults = [];
+      lastOutputFolder = '';
+      fileInput.value = '';
+      updatePreview();
+      resultsSection.classList.remove('visible');
+      resultsGrid.innerHTML = '';
+      outputInfo.style.display = 'none';
+      status.textContent = '';
+    });
+
+    classifyBtn.addEventListener('click', async () => {
+      if (!selectedFiles.length) return;
+
+      status.className = 'status loading';
+      status.innerHTML = '<span class="spinner"></span>Classifying images…';
+      classifyBtn.disabled = true;
+
+      const formData = new FormData();
+      selectedFiles.forEach(f => formData.append('images', f));
+
+      try {
+        const res = await fetch('/api/classify', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          status.className = 'status error';
+          status.textContent = data.error || 'Classification failed';
+          classifyBtn.disabled = false;
+          return;
+        }
+
+        lastResults = data.results;
+        lastOutputFolder = data.output_folder;
+        renderResults(data.results, data.output_path);
+
+        if (data.warnings?.length) {
+          status.className = 'status';
+          status.textContent = data.warnings.join(' · ');
+        } else {
+          status.className = 'status';
+          status.textContent = `Classified ${data.results.length} image(s). Saved to Downloads\\${data.output_folder}\\`;
+        }
+      } catch (err) {
+        status.className = 'status error';
+        status.textContent = 'Network error. Please try again.';
+      }
+
+      classifyBtn.disabled = false;
+    });
+
+    function renderResults(results, folderPath) {
+      resultsGrid.innerHTML = '';
+      resultsSection.classList.add('visible');
+      outputPath.textContent = folderPath;
+      outputInfo.style.display = 'block';
+
+      results.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        card.innerHTML = `
+          <img src="${item.preview}" alt="${item.label}">
+          <div class="result-card-body">
+            <span class="label-badge" style="background: ${item.color}">${item.label.replace(/_/g, ' ')}</span>
+            <div class="filename">${item.filename}</div>
+            <div class="renamed">→ ${item.renamed_filename}</div>
+            <div class="meta">Brightness: ${item.brightness} · Rank ${item.rank}</div>
+          </div>
+        `;
+        resultsGrid.appendChild(card);
+      });
+    }
+
+    downloadBtn.addEventListener('click', async () => {
+      if (!lastOutputFolder) return;
+
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ output_folder: lastOutputFolder }),
+      });
+
+      if (!res.ok) return;
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${lastOutputFolder}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>

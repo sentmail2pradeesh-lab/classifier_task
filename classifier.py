@@ -1,0 +1,57 @@
+import cv2
+import numpy as np
+
+EXPOSURE_LABELS = [
+    "Extra_Dark",
+    "Dark",
+    "Medium",
+    "Bright",
+    "Extra_Bright",
+]
+
+LABEL_COLORS = {
+    "Extra_Dark": "#1a1a2e",
+    "Dark": "#4a4e69",
+    "Medium": "#9a8c98",
+    "Bright": "#f2e9e4",
+    "Extra_Bright": "#ffd60a",
+}
+
+
+def compute_brightness(image_bytes: bytes) -> float:
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError("Unable to decode image")
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return float(np.mean(gray))
+
+
+def assign_label(index: int, total: int) -> str:
+    if total == 1:
+        return EXPOSURE_LABELS[2]  # Medium for a single image
+    label_idx = min(4, (index * 5) // total)
+    return EXPOSURE_LABELS[label_idx]
+
+
+def classify_images(images: list[dict]) -> list[dict]:
+    sorted_images = sorted(images, key=lambda x: x["brightness"])
+    total = len(sorted_images)
+    results = []
+
+    for index, item in enumerate(sorted_images):
+        label = assign_label(index, total)
+        extension = "." + item["filename"].rsplit(".", 1)[-1].lower()
+        if "." not in item["filename"]:
+            extension = ".jpg"
+
+        results.append(
+            {
+                **item,
+                "label": label,
+                "renamed_filename": f"{label}{extension}",
+                "rank": index + 1,
+            }
+        )
+
+    return results
