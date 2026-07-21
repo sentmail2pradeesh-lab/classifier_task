@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import zipfile
+import rawpy
 from datetime import datetime
 from pathlib import Path
 
@@ -16,7 +17,21 @@ app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024  # 2 GB
 
 OUTPUT_BASE = str(Path.home() / "Downloads")
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+ALLOWED_EXTENSIONS = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".bmp",
+    ".webp",
+    ".tif",
+    ".tiff",
+    ".cr2",
+    ".cr3",
+    ".nef",
+    ".arw",
+    ".raf",
+    ".dng"
+}
 
 
 def allowed_file(filename: str) -> bool:
@@ -31,12 +46,40 @@ def create_output_folder() -> tuple[str, str]:
     return folder_name, folder_path
 
 
-def save_image_to_disk(image_bytes: bytes, output_path: str) -> None:
-    arr = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if image is None:
-        raise ValueError("Unable to decode image")
-    cv2.imwrite(output_path, image)
+def save_image_to_disk(image_bytes, filename, output_path):
+    
+    extension = "." + filename.rsplit(".",1)[-1].lower()
+
+    raw_formats = {
+        ".cr2",
+        ".cr3",
+        ".nef",
+        ".arw",
+        ".raf",
+        ".dng"
+    }
+
+    if extension in raw_formats:
+
+        with rawpy.imread(image_bytes) as raw:
+
+            rgb = raw.postprocess(
+                use_camera_wb=True,
+                no_auto_bright=True,
+                output_bps=8
+            )
+
+        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+
+        cv2.imwrite(output_path, bgr)
+
+    else:
+
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+
+        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+        cv2.imwrite(output_path, image)
 
 
 def unique_filename(base_name: str, used_names: set[str]) -> str:
@@ -84,7 +127,10 @@ def classify():
 
         data = file.read()
         try:
-            brightness = compute_brightness(data)
+            brightness = compute_brightness(
+                data,
+                file.filename
+)           
             images.append(
                 {
                     "filename": file.filename,
@@ -111,7 +157,11 @@ def classify():
         raw = data_by_filename[item["filename"]]
         renamed = unique_filename(item["renamed_filename"], used_names)
         output_path = os.path.join(folder_path, renamed)
-        save_image_to_disk(raw, output_path)
+        save_image_to_disk(
+            raw,
+            item["filename"],
+            output_path
+)
 
         b64 = base64.b64encode(raw).decode("ascii")
         results.append(

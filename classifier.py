@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import rawpy
+import os
 
 EXPOSURE_LABELS = [
     "Extra_Dark",
@@ -18,12 +20,48 @@ LABEL_COLORS = {
 }
 
 
-def compute_brightness(image_bytes: bytes) -> float:
+def compute_brightness(image_bytes: bytes, filename: str) -> float:
+    
+    extension = "." + filename.rsplit(".", 1)[-1].lower()
+
+    raw_formats = {
+        ".cr2",
+        ".cr3",
+        ".nef",
+        ".arw",
+        ".raf",
+        ".dng"
+    }
+
+    # -------------------------
+    # RAW Image
+    # -------------------------
+    if extension in raw_formats:
+
+        with rawpy.imread(image_bytes) as raw:
+
+            rgb = raw.postprocess(
+                use_camera_wb=True,
+                no_auto_bright=True,
+                output_bps=8
+            )
+
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+
+        return float(np.mean(gray))
+
+    # -------------------------
+    # JPG / PNG
+    # -------------------------
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
+
     image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
     if image is None:
         raise ValueError("Unable to decode image")
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
     return float(np.mean(gray))
 
 
