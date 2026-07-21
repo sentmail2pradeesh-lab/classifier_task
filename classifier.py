@@ -2,21 +2,22 @@ import cv2
 import numpy as np
 import rawpy
 import os
+import io
 
 EXPOSURE_LABELS = [
-    "Extra_Dark",
+    #"Extra_Dark",
     "Dark",
     "Medium",
     "Bright",
-    "Extra_Bright",
+    #"Extra_Bright"
 ]
 
 LABEL_COLORS = {
-    "Extra_Dark": "#1a1a2e",
+    #"Extra_Dark": "#1a1a2e",
     "Dark": "#4a4e69",
     "Medium": "#9a8c98",
     "Bright": "#f2e9e4",
-    "Extra_Bright": "#ffd60a",
+    #"Extra_Bright": "#ffd60a",
 }
 
 
@@ -38,7 +39,7 @@ def compute_brightness(image_bytes: bytes, filename: str) -> float:
     # -------------------------
     if extension in raw_formats:
 
-        with rawpy.imread(image_bytes) as raw:
+        with rawpy.imread(io.BytesIO(image_bytes)) as raw:
 
             rgb = raw.postprocess(
                 use_camera_wb=True,
@@ -67,8 +68,13 @@ def compute_brightness(image_bytes: bytes, filename: str) -> float:
 
 def assign_label(index: int, total: int) -> str:
     if total == 1:
-        return EXPOSURE_LABELS[2]  # Medium for a single image
-    label_idx = min(4, (index * 5) // total)
+        return "Medium"
+
+    if total == 2:
+        return EXPOSURE_LABELS[index]   # Dark, Bright
+
+    label_idx = min(2, (index * 3) // total)
+
     return EXPOSURE_LABELS[label_idx]
 
 
@@ -80,16 +86,25 @@ def classify_images(images: list[dict]) -> list[dict]:
     for index, item in enumerate(sorted_images):
         label = assign_label(index, total)
         extension = "." + item["filename"].rsplit(".", 1)[-1].lower()
-        if "." not in item["filename"]:
+
+        raw_formats = {
+            ".cr2",
+            ".cr3",
+            ".nef",
+            ".arw",
+            ".raf",
+            ".dng"
+        }
+
+        if extension in raw_formats:
             extension = ".jpg"
 
         results.append(
-            {
-                **item,
-                "label": label,
-                "renamed_filename": f"{label}{extension}",
-                "rank": index + 1,
-            }
+        {
+            **item,
+            "label": label,
+            "renamed_filename": f"{label}{extension}",
+            "rank": index + 1,
+        }
         )
-
     return results

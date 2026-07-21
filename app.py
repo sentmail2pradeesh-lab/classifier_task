@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import zipfile
+import tempfile
 import rawpy
 from datetime import datetime
 from pathlib import Path
@@ -48,7 +49,7 @@ def create_output_folder() -> tuple[str, str]:
 
 def save_image_to_disk(image_bytes, filename, output_path):
     
-    extension = "." + filename.rsplit(".",1)[-1].lower()
+    extension = "." + filename.rsplit(".", 1)[-1].lower()
 
     raw_formats = {
         ".cr2",
@@ -59,27 +60,43 @@ def save_image_to_disk(image_bytes, filename, output_path):
         ".dng"
     }
 
+    # RAW Images
     if extension in raw_formats:
 
-        with rawpy.imread(image_bytes) as raw:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp:
+            temp.write(image_bytes)
+            temp_path = temp.name
 
-            rgb = raw.postprocess(
-                use_camera_wb=True,
-                no_auto_bright=True,
-                output_bps=8
-            )
+        try:
+            with rawpy.imread(temp_path) as raw:
+                rgb = raw.postprocess(
+                    use_camera_wb=True,
+                    no_auto_bright=True,
+                    output_bps=8
+                )
 
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
-        cv2.imwrite(output_path, bgr)
+            cv2.imwrite(output_path, bgr)
 
+        finally:
+            os.remove(temp_path)
+
+    # JPG / PNG / TIFF
     else:
 
         arr = np.frombuffer(image_bytes, dtype=np.uint8)
 
         image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
-        cv2.imwrite(output_path, image)
+        if image is None:
+            raise ValueError("Unable to decode image")
+
+        root, ext = os.path.splitext(output_path)
+
+        if ext.lower() in raw_formats:
+            output_path = root + ".jpg"
+        cv2.imwrite(output_path, image)    
 
 
 def unique_filename(base_name: str, used_names: set[str]) -> str:
@@ -104,6 +121,41 @@ def resolve_output_folder(folder_name: str) -> str | None:
     if os.path.commonpath([OUTPUT_BASE, os.path.abspath(folder_path)]) != os.path.abspath(OUTPUT_BASE):
         return None
     return folder_path
+
+def create_preview(image_bytes, filename):
+    
+    extension = "." + filename.rsplit(".", 1)[-1].lower()
+
+    raw_formats = {
+        ".cr2", ".cr3", ".nef", ".arw", ".raf", ".dng"
+    }
+
+    if extension in raw_formats:
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp:
+            temp.write(image_bytes)
+            temp_path = temp.name
+
+        try:
+            with rawpy.imread(temp_path) as raw:
+                rgb = raw.postprocess(
+                    use_camera_wb=True,
+                    no_auto_bright=True,
+                    output_bps=8
+                )
+        finally:
+            os.remove(temp_path)
+
+        image = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+
+    else:
+
+        arr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+    _, buffer = cv2.imencode(".jpg", image)
+
+    return "data:image/jpeg;base64," + base64.b64encode(buffer).decode("utf-8")
 
 
 @app.route("/")
@@ -163,7 +215,7 @@ def classify():
             output_path
 )
 
-        b64 = base64.b64encode(raw).decode("ascii")
+        preview = create_preview(raw, item["filename"])
         results.append(
             {
                 "filename": item["filename"],
@@ -172,7 +224,7 @@ def classify():
                 "brightness": round(item["brightness"], 2),
                 "rank": item["rank"],
                 "color": LABEL_COLORS[item["label"]],
-                "preview": f"data:image/jpeg;base64,{b64}",
+                "preview": preview,
                 "saved_path": output_path,
             }
         )

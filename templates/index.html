@@ -321,8 +321,12 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
       </svg>
       <h2>Drop images here or click to browse</h2>
-      <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/webp,image/bmp">
-    </div>
+<input
+    type="file"
+    id="images"
+    name="images"
+    multiple
+    accept=".jpg,.jpeg,.png,.bmp,.webp,.tif,.tiff,.cr2,.cr3,.nef,.arw,.raf,.dng">    </div>
 
     <div class="preview-bar" id="preview-bar">
       <h3>Selected (<span id="file-count">0</span> images)</h3>
@@ -350,7 +354,7 @@
 
   <script>
     const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
+    const fileInput = document.getElementById("images");    
     const classifyBtn = document.getElementById('classify-btn');
     const clearBtn = document.getElementById('clear-btn');
     const downloadBtn = document.getElementById('download-btn');
@@ -385,8 +389,16 @@
     fileInput.addEventListener('change', () => addFiles(fileInput.files));
 
     function addFiles(fileList) {
-      const newFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
-      selectedFiles = [...selectedFiles, ...newFiles];
+const allowedExtensions = [
+    "jpg","jpeg","png","bmp","webp",
+    "tif","tiff",
+    "cr2","cr3","nef","arw","raf","dng"
+];
+
+const newFiles = Array.from(fileList).filter(file => {
+    const ext = file.name.split(".").pop().toLowerCase();
+    return allowedExtensions.includes(ext);
+});      selectedFiles = [...selectedFiles, ...newFiles];
       updatePreview();
     }
 
