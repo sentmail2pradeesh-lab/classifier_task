@@ -315,7 +315,15 @@
     <header>
       <h1>Exposure Classifier</h1>
     </header>
+    <div style="margin-bottom:20px;text-align:center;">
 
+    <label for="exposureType"><b>Exposure Type</b></label>
+
+    <select id="exposureType" style="padding:8px 12px;margin-left:10px;">
+        <option value="3">3 Exposures</option>
+        <option value="5">5 Exposures</option>
+    </select>
+  </div>
     <div class="upload-zone" id="drop-zone">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
@@ -437,6 +445,10 @@ const newFiles = Array.from(fileList).filter(file => {
       classifyBtn.disabled = true;
 
       const formData = new FormData();
+      formData.append(
+        "exposure_type",
+        document.getElementById("exposureType").value
+      );
       selectedFiles.forEach(f => formData.append('images', f));
 
       try {

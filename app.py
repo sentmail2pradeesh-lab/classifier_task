@@ -166,6 +166,7 @@ def index():
 @app.route("/api/classify", methods=["POST"])
 def classify():
     files = request.files.getlist("images")
+    exposure_type = int(request.form.get("exposure_type", 3))
     if not files or all(f.filename == "" for f in files):
         return jsonify({"error": "No images uploaded"}), 400
 
@@ -195,9 +196,25 @@ def classify():
 
     if not images:
         return jsonify({"error": "No valid images found", "warnings": errors}), 400
+    if len(images) % exposure_type != 0:
+        return jsonify({
 
+        "error":
+        f"You selected {exposure_type} exposures, "
+        f"but uploaded {len(images)} images.\n"
+        f"Please upload images in multiples of {exposure_type}."
+
+    }),400
+    
     classified = classify_images(
-        [{"filename": img["filename"], "brightness": img["brightness"]} for img in images]
+    [
+        {
+            "filename": img["filename"],
+            "brightness": img["brightness"]
+        }
+        for img in images
+    ],
+    exposure_type
     )
 
     folder_name, folder_path = create_output_folder()
